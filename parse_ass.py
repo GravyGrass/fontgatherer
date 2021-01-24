@@ -13,7 +13,7 @@ fonts_requiring_weight = set()
 
 FONT_NAME_REGEX = re.compile(r'\\fn([^\\}]+)')
 BOLD_REGEX = re.compile(r'\\b([0-9]+)')
-ITALICS_REGEX = re.compile(r'\\i[0-9]+')
+ITALICS_REGEX = re.compile(r'\\i([0-9]+)')
 
 def trim_font(font):
     if font.startswith('@'):
@@ -24,16 +24,19 @@ def trim_font(font):
 for dirpath, dirnames, filenames in os.walk(ass_root_dir):
     for filename in filenames:
         if filename.endswith('.ass'):
+            # sys.stderr.write('Parsing ' + filename + '\n')
             with open(os.path.join(dirpath, filename), 'r', encoding=encoding) as f:
                 doc = ass.parse(f)
                 for style in doc.styles:
                     fonts.add(trim_font(style.fontname))
                 for event in doc.events:
                     fonts_in_event = set()
-                    if ITALICS_REGEX.search(event.text):
-                        raise NotImplementedError('Italic font is not supported: {}'.format(event.text))
                     for font_match in FONT_NAME_REGEX.finditer(event.text):
                         fonts_in_event.add(trim_font(font_match.group(1)))
+                    for italics_match in ITALICS_REGEX.finditer(event.text):
+                        italics_value = int(italics_match.group(1))
+                        if italics_value:
+                            raise NotImplementedError('Italic font is not supported: {}'.format(event.text))
                     for bold_match in BOLD_REGEX.finditer(event.text):
                         font_weight = int(bold_match.group(1))
                         if font_weight > 0:
