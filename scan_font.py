@@ -16,6 +16,7 @@ from typing import Any, DefaultDict, Dict, Iterable, List, NamedTuple, Union
 ENCODING = sys.getdefaultencoding()
 FIELD_SEPARATOR = '###___###'
 POSTSCRIPT_STYLE_NAME = '__PostScript__'
+DEFAULT_STYLE_NAME = '__DefaultStyle__'
 
 
 class FontChoice(NamedTuple):
@@ -123,7 +124,7 @@ def parse_fonts(root_path: str):
     location_to_postscript_names = parse_name_array(
         root_path,
         r'%{[]postscriptname{%{file}###___###%{index}###___###%{postscriptname}\n}}')
-    assert location_lang_family.keys() == location_lang_style.keys() \
+    assert all((key in location_lang_family for key in location_lang_style.keys())) \
         and location_lang_family.keys() == location_to_postscript_names.keys()
     location_font: Dict[FontLocation, FontInfo]
     location_font = {
@@ -147,6 +148,14 @@ def expand_families_with_styles(
     location: FontLocation,
     font: FontInfo,
     preferred_style_langs: List[str]) -> List[FontChoice]:
+    # The font file defines no styles. Return all family names with the default
+    # style name.
+    if not font.styles:
+        return [
+            FontChoice(location.filename, location.index, family, DEFAULT_STYLE_NAME)
+            for families in font.families.values()
+            for family in families]
+
     result = []
     style_lang = find_style_lang(font.styles, preferred_style_langs)
     if not style_lang:
@@ -198,19 +207,40 @@ def collect_files(paths: Iterable[str], destination_dir: str):
 
 
 # Never include these font families in the collection
-IGNORED_FONTS = set(['微软雅黑'])
+IGNORED_FONTS = set([
+    # Fonts included in Microsoft Windows
+    'Arial',
+    '微软雅黑',
+
+    # EVA-FANS refers to this custom font, but didn't include it in their MKV
+    # file
+    'QRJQdFfleAsqlZI',
+])
 
 # Only allow regular or bold styles to match. Font weight is not supported.
-PREFERRED_STYLES = set(['Regular', 'Bold', POSTSCRIPT_STYLE_NAME])
+PREFERRED_STYLES = set([
+    'Regular',
+    'Bold',
+    POSTSCRIPT_STYLE_NAME,
+    DEFAULT_STYLE_NAME,
+])
 
 # Allow all styles when processing these font families
 # Some fonts don't have a "Regular" style option
 FONT_FAMILIES_IGNORING_STYLE = set([
+    # 汉仪 uses non-standard style names
     'HYQiHei-35S',
     '汉仪旗黑-35S',
+    'HYQiHei-40S',
+    'HYQiHei-45S',
     'HYQiHei-65S',
     '汉仪旗黑-65S',
     'HYQiHei-80S',
+    'HYQiHei-90S',
+
+    # EVA-FANS custom fonts
+    'QyxlaXVFMmip',
+    'RwEyrLjRFBE',
 ])
 
 PREFERRED_STYLE_LANG = 'en'
